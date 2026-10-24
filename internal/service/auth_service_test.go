@@ -3,14 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"testing"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/pieremarie/chessmobile/internal/model"
 	"github.com/pieremarie/chessmobile/internal/repository"
 	"golang.org/x/crypto/bcrypt"
-	"testing"
-	"time"
 )
 
 type fakeRepo struct {
@@ -61,7 +61,7 @@ func TestLogin(t *testing.T) {
 	}{
 		{"success", "password123", nil, nil},
 		{"wrong password", "wrongpass", nil, ErrInvalidCredentials},
-		{"unknown email", "password123", pgx.ErrNoRows, ErrInvalidCredentials},
+		{"unknown email", "password123", ErrUserNotFound, ErrInvalidCredentials},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
