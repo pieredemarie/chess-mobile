@@ -80,3 +80,17 @@ func (a *AuthService) Login(ctx context.Context, email, password string) (string
 	}
 	return signed, nil
 }
+
+// VerifyToken validates an access token and returns its user ID.
+func (a *AuthService) VerifyToken(token string) (uuid.UUID, error) {
+	claims := &jwt.RegisteredClaims{}
+	parsed, err := jwt.ParseWithClaims(token, claims, func(t *jwt.Token) (interface{}, error) { return a.secret, nil }, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithExpirationRequired())
+	if err != nil || !parsed.Valid {
+		return uuid.Nil, ErrInvalidCredentials
+	}
+	id, err := uuid.Parse(claims.Subject)
+	if err != nil {
+		return uuid.Nil, ErrInvalidCredentials
+	}
+	return id, nil
+}
