@@ -5,15 +5,16 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pieremarie/chessmobile/internal/chesslogic"
 	"github.com/pieremarie/chessmobile/internal/handler"
-	"github.com/pieremarie/chessmobile/internal/hub"
 	"github.com/pieremarie/chessmobile/internal/repository"
 	"github.com/pieremarie/chessmobile/internal/service"
+	"github.com/pieremarie/chessmobile/internal/timedhub"
 )
 
 func main() {
@@ -38,14 +39,18 @@ func main() {
 	r.POST("/auth/register", h.Register)
 	r.POST("/auth/login", h.Login)
 	gameStore := repository.NewGameRepository(db)
-	games := hub.New(gameStore, func(id uuid.UUID) (chesslogic.Game, error) {
+	games := timedhub.NewWithTimeControl(gameStore, func(id uuid.UUID) (chesslogic.Game, error) {
 		fen, err := gameStore.FEN(context.Background(), id)
 		if err != nil {
 			return nil, err
 		}
 		return chesslogic.FromFEN(fen)
-	})
-	r.GET("/ws/games/:id", handler.NewGameHandler(games, a).Serve)
+	}, 10*time.Minute, 0)
+	r.GET("/ws/games/:id", handler.NewTimedGameHandler(games, a).Serve)
+	matchmaking := &handler.MatchmakingHandler{Matchmaker: service.NewMatchmaker(gameStore), Auth: a}
+	r.POST("/matchmaking/search", matchmaking.Search)
+	r.GET("/matchmaking/status", matchmaking.Status)
+	r.DELETE("/matchmaking/search", matchmaking.Cancel)
 	addr := os.Getenv("ADDR")
 	if addr == "" {
 		addr = ":8080"
